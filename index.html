@@ -1,71 +1,102 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email:Pass Processor</title>
+    <title>Email Password Validator</title>
     <style>
-        textarea { width: 100%; height: 200px; }
-        button { margin: 5px; }
-        .section { margin-bottom: 20px; }
+        .hidden { display: none; }
+        .box { margin: 10px 0; }
+        .toggle-section { cursor: pointer; color: blue; text-decoration: underline; }
     </style>
 </head>
 <body>
-    <h1>Email:Pass Processor</h1>
-    <textarea id="inputArea" placeholder="Paste your [EMAIL:PASS] combos here..."></textarea>
-    <button onclick="processData()">Process</button>
-
-
-    <div class="section">
-        <h2>Unique Entries</h2>
-        <textarea id="uniqueEntries" readonly></textarea>
-        <button onclick="copyToClipboard('uniqueEntries')">Copy All</button>
-        <button onclick="sortUnique('az')">Sort A-Z</button>
-        <button onclick="sortUnique('za')">Sort Z-A</button>
-        <button onclick="sortUnique('smallest')">Smallest First</button>
-        <button onclick="sortUnique('biggest')">Biggest First</button>
-        <button onclick="sortUnique('random')">Random Sort</button>
+    <h1>Email Password Validator</h1>
+    
+    <textarea id="input-field" rows="10" cols="50" placeholder="Paste your email:password lines here..." oninput="updateTotalLines()"></textarea>
+    <div>
+        <p>Total Lines: <span id="total-lines">0</span></p>
+    </div>
+    <button onclick="validateAccounts()">Validate Accounts</button>
+    
+    <div class="box">
+        <p>Cleaned Lines:</p>
+        <textarea id="cleaned-accounts" rows="10" cols="50" readonly></textarea>
+        <button onclick="copyToClipboard()">Copy to Clipboard</button>
+        <p>Total Clean Lines: <span id="total-clean-lines">0</span></p>
+        <p>Total Lines Removed: <span id="total-removed-lines">0</span></p>
     </div>
 
+    <button onclick="enableEmailSorting()">Sort Lines by Email Provider</button>
+    <div id="email-sorting" class="hidden"></div>
 
-    <div class="section">
-        <h2>Duplicate Complete Lines</h2>
-        <textarea id="duplicateLines" readonly></textarea>
-        <button onclick="copyToClipboard('duplicateLines')">Copy All</button>
-    </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        let domainMap = {};
 
+        function updateTotalLines() {
+            const lines = $('#input-field').val().split('\n').filter(line => line.trim() !== '');
+            $('#total-lines').text(lines.length);
+        }
 
-    <div class="section">
-        <h2>Duplicate Emails</h2>
-        <textarea id="duplicateEmails" readonly></textarea>
-        <button onclick="copyToClipboard('duplicateEmails')">Copy All</button>
-    </div>
+        function validateAccounts() {
+            const inputField = $('#input-field').val();
+            const lines = inputField.split('\n').filter(line => line.trim() !== '');
+            const cleanedAccounts = new Set();
 
+            const originalLines = lines.length;
 
-    <div class="section">
-        <h2>Duplicate Passwords</h2>
-        <textarea id="duplicatePasswords" readonly></textarea>
-        <button onclick="copyToClipboard('duplicatePasswords')">Copy All</button>
-    </div>
+            const emailPasswordTemplate = /^[^\s@]+@[^\s@]+\.[^\s@]+:\S{4,}$/;
 
+            for (let line of lines) {
+                if (emailPasswordTemplate.test(line)) {
+                    cleanedAccounts.add(line);
+                }
+            }
 
-    <div class="section">
-        <h2>Short Passwords (< 4 characters)</h2>
-        <textarea id="shortPasswords" readonly></textarea>
-        <button onclick="copyToClipboard('shortPasswords')">Copy All</button>
-    </div>
+            const sortedCleanedAccounts = Array.from(cleanedAccounts).sort();
+            
+            $('#cleaned-accounts').val(sortedCleanedAccounts.join('\n'));
+            $('#total-clean-lines').text(cleanedAccounts.size);
+            $('#total-removed-lines').text(originalLines - cleanedAccounts.size);
+        }
 
+        function copyToClipboard() {
+            const cleanedAccounts = document.getElementById('cleaned-accounts');
+            cleanedAccounts.select();
+            document.execCommand('copy');
+        }
 
-    <p>Original Line Count: <span id="originalCount"></span></p>
-    <p>Current Unique Line Count: <span id="uniqueCount"></span></p>
-    <p>Total Trash Lines Removed: <span id="trashCount"></span></p>
-    <p>Total Time: <span id="totalTime"></span> seconds</p>
+        function enableEmailSorting() {
+            const cleanedAccounts = $('#cleaned-accounts').val().split('\n');
+            domainMap = {};
 
+            cleanedAccounts.forEach(account => {
+                const email = account.split(':')[0];
+                const domain = email.split('@')[1];
 
-    <button onclick="sortByEmailDomain()">Sort by Email Domain</button>
-    <div id="domainSections"></div>
+                if (!domainMap[domain]) {
+                    domainMap[domain] = [];
+                }
 
+                domainMap[domain].push(account);
+            });
 
-    <script src="core.js"></script>
+            const sortedDomains = Object.keys(domainMap).sort((a, b) => domainMap[b].length - domainMap[a].length);
+            let emailSortingHtml = `<p>Total Unique Providers: ${sortedDomains.length}</p>`;
+
+            sortedDomains.forEach(domain => {
+                emailSortingHtml += `<div class="box">
+                                        <p class="toggle-section" onclick="showProviderEmails('${domain}')">${domain} (${domainMap[domain].length})</p>
+                                     </div>`;
+            });
+
+            $('#email-sorting').html(emailSortingHtml).removeClass('hidden');
+        }
+
+        function showProviderEmails(domain) {
+            const cleanedAccounts = $('#cleaned-accounts');
+            const providerEmails = domainMap[domain].join('\n');
+            cleanedAccounts.val(providerEmails);
+        }
+    </script>
 </body>
 </html>
